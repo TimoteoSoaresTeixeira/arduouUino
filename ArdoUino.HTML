@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arduino Monitor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #data-container {
+            font-size: 48px;
+            font-weight: bold;
+            color: #00ffcc;
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #333;
+            border-radius: 10px;
+            min-width: 200px;
+            text-align: center;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        button:active { background-color: #0056b3; }
+        #status { margin-top: 15px; color: #aaaaaa; }
+    </style>
+</head>
+<body>
+
+    <h1>Receptor Bluetooth</h1>
+    <button id="btn-connect">Conectar Placa</button>
+    <div id="status">Status: Desconectado</div>
+    
+    <!-- Aqui é onde o dado do Arduino vai aparecer -->
+    <div id="data-container">--</div>
+
+    <script>
+        const btnConnect = document.getElementById('btn-connect');
+        const statusText = document.getElementById('status');
+        const dataContainer = document.getElementById('data-container');
+
+        // Nota: Os UUIDs abaixo precisarão ser ajustados depois com base no seu código do Arduino
+        // Estes são apenas placeholders genéricos para BLE
+        const SERVICE_UUID = '4fafc201-1fb5-459e-8fcc-c5c9c331914b'; 
+        const CHARACTERISTIC_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+
+        btnConnect.addEventListener('click', async () => {
+            try {
+                statusText.innerText = 'Status: Procurando dispositivo...';
+                
+                // Solicita conexão com a placa
+                const device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true, 
+                    optionalServices: [SERVICE_UUID] 
+                });
+
+                statusText.innerText = 'Status: Conectando...';
+                const server = await device.gatt.connect();
+                
+                statusText.innerText = 'Status: Obtendo serviço...';
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                
+                statusText.innerText = 'Status: Preparando leitura...';
+                const characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+                
+                // Inicia o recebimento contínuo de dados
+                await characteristic.startNotifications();
+                statusText.innerText = 'Status: Conectado e recebendo dados! 🟢';
+                
+                // Evento disparado toda vez que o Arduino envia um dado
+                characteristic.addEventListener('characteristicvaluechanged', (event) => {
+                    const value = new TextDecoder().decode(event.target.value);
+                    dataContainer.innerText = value;
+                });
+
+                device.addEventListener('gattserverdisconnected', () => {
+                    statusText.innerText = 'Status: Desconectado 🔴';
+                });
+
+            } catch (error) {
+                console.error(error);
+                statusText.innerText = 'Erro: ' + error.message;
+            }
+        });
+    </script>
+</body>
+</html>
